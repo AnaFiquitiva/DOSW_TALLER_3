@@ -1,36 +1,76 @@
-# This is a basic workflow to help you get started with Actions
+name: CI/CD Pipeline
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: Hecho Hello, world!
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Start MongoDB
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          docker run -d -p 27017:27017 --name mongodb mongo:6.0
+          sleep 15
+
+      - name: Build and test with Maven
+        run: |
+          mvn clean test
+          echo "Tests completed successfully!"
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/site/surefire-report.html
+          retention-days: 7
+
+      - name: Stop MongoDB
+        if: always()
+        run: docker stop mongodb || true
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn clean compile -DskipTests
+
+      - name: Package application
+        run: mvn package -DskipTests
+
+      - name: Upload JAR file
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: target/*.jar
