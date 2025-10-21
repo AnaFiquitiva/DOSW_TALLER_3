@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-class MessageResponse {
+public class MessageResponse {
     private String message;
     private String timestamp;
 }
