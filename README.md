@@ -2,13 +2,19 @@
  Taller Aplicativo CI/CD
 
 
+Comandos
+# Clonar el repositorio
+git clone
+
+
+
 # Limpiar y compilar
 mvn clean compile
 
 # Ejecutar la aplicación
 mvn spring-boot:run
 
-# O compilar y empaquetar
+#  compilar y empaquetar
 mvn clean package
 
 
