@@ -1,0 +1,32 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "develop" ]
+  pull_request:
+    branches: [ "develop" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Start MongoDB
+      run: |
+        docker run -d -p 27017:27017 --name mongo-test mongo:6.0
+        sleep 5
+        
+    - name: Build and test with Maven
+      run: mvn -B test
+      
+    - name: Stop MongoDB
+      run: docker stop mongo-test
