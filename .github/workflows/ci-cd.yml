@@ -1,0 +1,88 @@
+name: CI/CD Pipeline
+
+# Controla cuándo se ejecutará el flujo de trabajo
+on:
+  # Se activa con pushes a las ramas main y develop
+  push:
+    branches: [ main, develop ]
+  # Se activa con pull requests dirigidos a la rama develop
+  pull_request:
+    branches: [ develop ]
+
+# Una secuencia de trabajos que se ejecutarán
+jobs:
+  # --- TRABAJO DE INTEGRACIÓN CONTINUA (CI) ---
+  # Este trabajo se ejecuta para todas las ramas y PRs
+  build-and-test:
+    # El tipo de máquina virtual en la que se ejecutará el trabajo
+    runs-on: ubuntu-latest
+
+    # Pasos que componen el trabajo
+    steps:
+      # Paso 1: Descargar el código del repositorio
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Paso 2: Configurar el entorno Java 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Paso 3: Cachear las dependencias de Maven para acelerar las ejecuciones
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Paso 4: Ejecutar las pruebas unitarias con Maven
+      - name: Run tests
+        run: mvn -B test
+
+  # --- TRABAJO DE DESPLIEGUE CONTINUO (CD) ---
+  # Este trabajo solo se ejecuta cuando hay un push a la rama main
+  deploy-to-azure:
+    # Se ejecuta en la misma máquina virtual
+    runs-on: ubuntu-latest
+    # Depende de que el trabajo 'build-and-test' se complete con éxito
+    needs: build-and-test
+    # Condición para que solo se ejecute en pushes a la rama main
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      # Paso 1: Descargar el código del repositorio
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Paso 2: Configurar el entorno Java 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Paso 3: Cachear las dependencias de Maven
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Paso 4: Construir el artefacto JAR con Maven (omitir pruebas, ya se ejecutaron)
+      - name: Build with Maven
+        run: mvn -B package -DskipTests
+
+      # Paso 5: Desplegar en Azure App Service
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          # Nombre de tu aplicación en Azure. ¡REEMPLAZA ESTO!
+          app-name: 'masterchef-api-az'
+          # Nombre del secreto de GitHub que contiene el perfil de publicación
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          # Ruta al paquete JAR generado por Maven
+          package: target/*.jar
